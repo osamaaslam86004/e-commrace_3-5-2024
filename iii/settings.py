@@ -50,8 +50,10 @@ SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-if DEBUG:    # localhost and "diverse-intense-" must be in list for password reset functionality
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "diverse-intense-whippet.ngrok-free.app"]
+if (
+    DEBUG
+):  # localhost and "diverse-intense-" must be in list for password reset functionality
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
     # ALLOWED_HOSTS = ["diverse-intense-whippet.ngrok-free.app", "localhost:8000"]
 else:
     ALLOWED_HOSTS = ["osama11111.pythonanywhere.com"]
@@ -130,9 +132,6 @@ DATABASES = {
 }
 
 
-
-
-
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
@@ -200,22 +199,24 @@ SESSION_COOKIE_HTTPONLY = True
 
 ###############################Cloudinary Settings For Image Storage###########################
 import cloudinary
+
 if DEBUG:
     cloudinary.config(
-    cloud_name="dh8vfw5u0",
-    api_key="667912285456865",
-    api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
-    # api_proxy = "http://proxy.server:3128"
-)
+        cloud_name="dh8vfw5u0",
+        api_key="667912285456865",
+        api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
+        # api_proxy = "http://proxy.server:3128"
+    )
 else:
     cloudinary.config(
-    cloud_name="dh8vfw5u0",
-    api_key="667912285456865",
-    api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
-    api_proxy = "http://proxy.server:3128"
-)
+        cloud_name="dh8vfw5u0",
+        api_key="667912285456865",
+        api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
+        api_proxy="http://proxy.server:3128",
+    )
 import cloudinary.uploader
 import cloudinary.api
+
 CLOUDINARY_STORAGE = {
     "CLOUD_NAME": "dh8vfw5u0",
     "API_KEY": "667912285456865",
@@ -247,18 +248,23 @@ GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET")
 if not DEBUG:
     GOOGLE_OAUTH_REDIRECT_URI = [
-        "https://osama11111.pythonanywhere.com/accounts/google/login/callback/"]
+        "https://osama11111.pythonanywhere.com/accounts/google/login/callback/"
+    ]
 else:
     GOOGLE_OAUTH_REDIRECT_URI = [
-        "http://localhost:8000/accounts/google/login/callback/"]
-        # "https://diverse-intense-whippet.ngrok-free.app/accounts/google/login/callback/"]
+        "http://localhost:8000/accounts/google/login/callback/"
+    ]
+    # "https://diverse-intense-whippet.ngrok-free.app/accounts/google/login/callback/"]
 
 
 # csrf settings
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 if DEBUG:
-    CSRF_TRUSTED_ORIGINS = ["https://diverse-intense-whippet.ngrok-free.app"]
+    CSRF_TRUSTED_ORIGINS = [
+        "http://127.0.0.1",
+        "https://diverse-intense-whippet.ngrok-free.app",
+    ]
 else:
     CSRF_TRUSTED_ORIGINS = ["https://osama11111.pythonanywhere.com"]
 

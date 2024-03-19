@@ -36,7 +36,6 @@ from django.http import (
 from django.template import loader
 from django.utils.safestring import mark_safe
 import json, random, stripe, requests
-from django.conf import settings
 from urllib.parse import urlencode
 from django.urls import reverse
 from google.oauth2.credentials import Credentials
@@ -46,7 +45,6 @@ from twilio.rest import Client
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.views import View
 from django.views.generic import TemplateView
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
@@ -55,31 +53,29 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
-from i.browsing_history import your_browsing_history
 from axes.decorators import axes_dispatch
 from checkout.models import Payment
-
+from django.views import View
+from django.conf import settings
 
 
 import cloudinary
+
 if not settings.DEBUG:
     cloudinary.config(
-    cloud_name="dh8vfw5u0",
-    api_key="667912285456865",
-    api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
-    api_proxy = "http://proxy.server:3128"
-)
+        cloud_name="dh8vfw5u0",
+        api_key="667912285456865",
+        api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
+        api_proxy="http://proxy.server:3128",
+    )
 else:
     cloudinary.config(
-    cloud_name="dh8vfw5u0",
-    api_key="667912285456865",
-    api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8"
-)
+        cloud_name="dh8vfw5u0",
+        api_key="667912285456865",
+        api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
+    )
 import cloudinary.uploader
 from cloudinary.uploader import upload
-
-
-
 
 
 class HomePageView(TemplateView):
@@ -87,7 +83,9 @@ class HomePageView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        obj_list = None  # Initialize obj_list with a default value
+
+        headers = {"Content-Type": "application/json"}
+        url = "https://diverse-intense-whippet.ngrok-free.app/Homepage/"
         images = [
             "box_7",
             "box_6",
@@ -100,14 +98,33 @@ class HomePageView(TemplateView):
             "ama_zon_logo",
         ]
         cart_icon = "cart_50_50"
+        data = {"images": images, "cart_icon": cart_icon}
+        json_data = json.dumps(data)
 
-        image_urls = [cloudinary.CloudinaryImage(name).build_url() for name in images]
-        cart_url = cloudinary.CloudinaryImage(cart_icon).build_url()
-        zipped = your_browsing_history(self.request)
+        try:
+            response = requests.post(
+                url, data=json_data, headers=headers, verify=True
+            )  # Enable certificate verification
+            response.raise_for_status()  # Raise an exception for non-200 status codes
 
-        context["images"] = image_urls
-        context["cart_url"] = cart_url
-        context["zipped"] = zipped
+            if response.status_code == 200:
+                data = response.json()
+                print(f"data_________________{data}")
+                print(f"headers: {response.headers}")
+
+                image_urls = data.get("data", {}).get("images", [])
+                cart_url = data.get("data", {}).get("cart_icon")
+                zipped = data.get("zipped")
+
+                context["images"] = image_urls
+                context["cart_url"] = cart_url
+                context["zipped"] = zipped
+            else:
+                print(f"Unexpected content type: {response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error making request: {e}")
+
         return context
 
 
@@ -124,23 +141,33 @@ class SignupView(View):
             "email"
         )  # Assuming the email comes from the form POST data
 
-        existing_social_user = SocialAccount.objects.filter(
-            user_info__icontains=email
-        ).exists()
-        # Check if the user with the email already exists
-        existing_user = CustomUser.objects.filter(email=email).exists()
+        headers = {"Content-Type" : "application/json"}
+        url = "https://diverse-intense-whippet.ngrok-free.app/api/auth/check-email/"
+        data = json.dumps({"email" : email})
 
-        if existing_social_user or existing_user:
+        response = requests.post(url=url, data=data, headers=headers, verify=False)
+
+        if response.status_code == 200:
             messages.error(request, "A user with the email already exists")
             return redirect("Homepage:signup")
         else:
             form = self.form_class(request.POST)
-            if form.is_valid():
-                user = form.save()
-                if user is not None:
-                    messages.success(request, "your account is created, Please login!")
-                    return redirect("Homepage:login")
+
+            sign_up_form_data = form.cleaned_data
+            print(f"form_daat_____________________{sign_up_form_data}")
+            data = json.dumps(sign_up_form_data)
+            print(f"data_________________{data}")
+
+            headers = {"Content-Type" : "application/json"}
+            url = "https://diverse-intense-whippet.ngrok-free.app/api/auth/crud-user/"
+
+            response = requests.post(url=url, data=data, headers=headers, verify=False)
+            if response.status_code == 200:
+
+                messages.success(request, "your account is created, Please login!")
+                return redirect("Homepage:login")
             else:
+                messages.success(request, "{response.content}")
                 for field, errors in form.errors.items():
                     for error in errors:
                         messages.error(request, f"{field}: {error}")
@@ -262,18 +289,15 @@ def custom_password_reset(request):
                 # Define the email message
                 message = {
                     "personalizations": [
-                        {
-                            "to": [{"email": email}],
-                            "subject": "Reset your password"
-                        }
+                        {"to": [{"email": email}], "subject": "Reset your password"}
                     ],
                     "from": {"email": settings.CLIENT_EMAIL},
                     "content": [
                         {
                             "type": "text/html",
-                            "value": f'Click the link to reset your password: <a href="{reset_url}">{reset_url}</a>'
+                            "value": f'Click the link to reset your password: <a href="{reset_url}">{reset_url}</a>',
                         }
-                    ]
+                    ],
                 }
                 # Convert the message to JSON format
                 message_json = json.dumps(message)
@@ -281,17 +305,20 @@ def custom_password_reset(request):
                 # Set the headers with the API key
                 headers = {
                     "Authorization": f"Bearer {SENDGRID_API_KEY}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 }
 
                 # Send the email using the requests library
-                response = requests.post(SENDGRID_API_ENDPOINT, headers=headers, data=message_json,
-                                        verify = False)
+                response = requests.post(
+                    SENDGRID_API_ENDPOINT,
+                    headers=headers,
+                    data=message_json,
+                    verify=False,
+                )
 
                 # Check the response
                 print(response.status_code)
                 print(response.content)  # it will be empty : b''
-
 
                 # response = sg.send(message)
 
@@ -304,7 +331,7 @@ def custom_password_reset(request):
                     # If something went wrong, redirect to a different view or page
                     return redirect("Homepage:signup")
             except Exception as e:
-                return JsonResponse({'message': f'Error: {str(e)}'}, status=500)
+                return JsonResponse({"message": f"Error: {str(e)}"}, status=500)
                 # return redirect("Homepage:login")
         else:
             messages.error(request, "No user found with this email.")
@@ -477,14 +504,14 @@ def your_callback_view(request):
                         if "user_id" in request.session:
                             logout(request)
                             request.session["user_id"] = social_account.id
-                            request.session[
-                                "access_token"
-                            ] = social_account.access_token
+                            request.session["access_token"] = (
+                                social_account.access_token
+                            )
                         else:
                             request.session["user_id"] = social_account.id
-                            request.session[
-                                "access_token"
-                            ] = social_account.access_token
+                            request.session["access_token"] = (
+                                social_account.access_token
+                            )
                         messages.success(request, "Welcome! you are logged-in")
                     else:
                         pass
@@ -1505,7 +1532,7 @@ def send_email(request):
     dynamic_data = {
         "customerName": "John Doe",
         "orderDate": "04/12/23",
-        "customerEmail": "osama.aslam.86004@gmail.com"
+        "customerEmail": "osama.aslam.86004@gmail.com",
         # Add more dynamic data as needed
     }
 
@@ -1587,7 +1614,7 @@ def send_sms(request):
                 user_entered_email = form.cleaned_data["email"]
                 request.session["email"] = user_entered_email
                 print(f"email___________{request.session['email']}")
-   
+
                 user = CustomUser.objects.get(email=user_entered_email)
                 user_profile = UserProfile.objects.get(user=user)
 
@@ -1597,8 +1624,7 @@ def send_sms(request):
                     request.session["generated_otp"] = generated_otp
                     phone_number = user_profile.phone_number
                     print(f"generated_otp___________{request.session['generated_otp']}")
-      
-                    
+
                     if helper_function(generated_otp, phone_number):
                         form = OTPForm
                         messages.success(
@@ -1659,18 +1685,17 @@ def send_sms(request):
             return JsonResponse({"message": f"Error: {str(e)}"}, status=500)
 
 
-
-
 def helper_function(generated_otp, phone_number):
     import requests
+
     # Twilio API endpoint
     endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{settings.ACCOUNT_SID}/Messages.json"
 
     # Construct the request payload
     payload = {
         "From": settings.FROM_,
-        "To": str(phone_number), # otherwise 'PhoneNumber' object is not iterable
-        "Body": f"Your OTP is: {generated_otp}"
+        "To": str(phone_number),  # otherwise 'PhoneNumber' object is not iterable
+        "Body": f"Your OTP is: {generated_otp}",
     }
 
     # HTTP Basic Authentication credentials
@@ -1684,8 +1709,6 @@ def helper_function(generated_otp, phone_number):
         return True
     else:
         return False
-
-
 
     # # message body
     # message_body = f"Your OTP is: {generated_otp}"
