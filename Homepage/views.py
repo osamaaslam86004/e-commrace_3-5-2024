@@ -137,6 +137,7 @@ class SignupView(View):
         return render(request, self.template_name, {"form": form})
 
     def post(self, request):
+        form = self.form_class(request.POST)
         email = request.POST.get(
             "email"
         )  # Assuming the email comes from the form POST data
@@ -145,29 +146,41 @@ class SignupView(View):
         url = "https://diverse-intense-whippet.ngrok-free.app/api/auth/check-email/"
         data = json.dumps({"email" : email})
 
-        response = requests.post(url=url, data=data, headers=headers, verify=False)
-
-        if response.status_code == 200:
-            messages.error(request, "A user with the email already exists")
-            return redirect("Homepage:signup")
-        else:
-            form = self.form_class(request.POST)
-
-            sign_up_form_data = form.cleaned_data
-            print(f"form_daat_____________________{sign_up_form_data}")
-            data = json.dumps(sign_up_form_data)
-            print(f"data_________________{data}")
-
-            headers = {"Content-Type" : "application/json"}
-            url = "https://diverse-intense-whippet.ngrok-free.app/api/auth/crud-user/"
-
+        try:
             response = requests.post(url=url, data=data, headers=headers, verify=False)
-            if response.status_code == 200:
+            response.raise_for_status()
+            data = response.json()
 
-                messages.success(request, "your account is created, Please login!")
-                return redirect("Homepage:login")
+            if "exist" in data and data["exists"] == "True":
+                messages.error(request, "A user with the email already exists")
+                return redirect("Homepage:signup")
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Error making request: {e}")
+
+        else:
+            if form.is_valid():
+
+                sign_up_form_data = form.cleaned_data
+                print(f"form_daat_____________________{sign_up_form_data}")
+                data = json.dumps(sign_up_form_data)
+                print(f"data_________________{data}")
+
+                headers = {"Content-Type" : "application/json"}
+                url = "https://diverse-intense-whippet.ngrok-free.app/api/auth/crud-user/"
+
+                try:
+                    response = requests.post(url=url, data=data, headers=headers, verify=False)
+                    response.raise_for_status()
+
+                    messages.success(request, "your account is created, Please login!")
+                    return redirect("Homepage:login")
+                
+                except requests.exceptions.RequestException as e:
+                    messages.error(request, f"{e}")
+                    return render(request, self.template_name, {"form": form})
+
             else:
-                messages.success(request, "{response.content}")
                 for field, errors in form.errors.items():
                     for error in errors:
                         messages.error(request, f"{field}: {error}")
